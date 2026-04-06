@@ -22,33 +22,66 @@ import { TARIFF_BODY } from './tariffCorpus';
 
 import './App.css';
 
-const STAGE_PAD = 20;
-const LINE_HEIGHT = 12;
-const FONT_SIZE = 12;
 const FONT_FAMILY = '"Favorit Mono", ui-monospace, Consolas, monospace';
-const FONT = `${FONT_SIZE}px ${FONT_FAMILY}`;
-
-const SMOOTH = 5;
 
 type ShapeKind = 'star' | 'ring' | 'logo';
 
-const STAR_OUTER_R = 160;
-const STAR_INNER_R = 70;
-const STAR_TIPS = 5;
-const STAR_PAD = 6;
-
-const RING_OUTER_R = 140;
-const RING_BORDER = 20;
-const RING_PAD = 4;
-
-const LOGO_SCALE = 2.5;
-const LOGO_PAD = 4;
+function Slider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="flow-slider">
+      <span className="flow-slider-label">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      <span className="flow-slider-value">{value}</span>
+    </label>
+  );
+}
 
 export function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
-  const [showBorder, setShowBorder] = useState(true);
+
+  const [showBorder, setShowBorder] = useState(false);
+  const [hyphenate, setHyphenate] = useState(true);
   const [shape, setShape] = useState<ShapeKind>('logo');
+
+  const [fontSize, setFontSize] = useState(12);
+  const [lineHeight, setLineHeight] = useState(12);
+  const [stagePad, setStagePad] = useState(20);
+  const [smoothFactor, setSmoothFactor] = useState(5);
+
+  const [starOuterR, setStarOuterR] = useState(160);
+  const [starInnerR, setStarInnerR] = useState(70);
+  const [starTips, setStarTips] = useState(5);
+  const [starPad, setStarPad] = useState(6);
+
+  const [ringOuterR, setRingOuterR] = useState(140);
+  const [ringBorder, setRingBorder] = useState(20);
+  const [ringPad, setRingPad] = useState(4);
+
+  const [logoScale, setLogoScale] = useState(2.5);
+  const [logoPad, setLogoPad] = useState(4);
+
   const [smoothCursor, setSmoothCursor] = useState<{
     x: number;
     y: number;
@@ -58,8 +91,16 @@ export function App() {
   const smoothRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const snapNextRef = useRef(true);
   const rafTimeRef = useRef<number | null>(null);
+  const smoothFactorRef = useRef(smoothFactor);
+  useEffect(() => {
+    smoothFactorRef.current = smoothFactor;
+  }, [smoothFactor]);
 
-  const prepared = useMemo(() => prepareWithSegments(TARIFF_BODY, FONT), []);
+  const font = `${fontSize}px ${FONT_FAMILY}`;
+  const prepared = useMemo(
+    () => prepareWithSegments(TARIFF_BODY, font),
+    [font],
+  );
 
   useLayoutEffect(() => {
     const el = stageRef.current;
@@ -96,7 +137,7 @@ export function App() {
         return;
       }
 
-      const t = 1 - Math.exp(-SMOOTH * dt);
+      const t = 1 - Math.exp(-smoothFactorRef.current * dt);
       const s = smoothRef.current;
       if (snapNextRef.current) {
         smoothRef.current = { x: target.x, y: target.y };
@@ -129,9 +170,9 @@ export function App() {
     const { x, y } = smoothCursor;
 
     if (shape === 'star') {
-      const pts = starPolygon(x, y, STAR_OUTER_R, STAR_INNER_R, STAR_TIPS);
+      const pts = starPolygon(x, y, starOuterR, starInnerR, starTips);
       return {
-        obstacles: [{ kind: 'polygon', points: pts, pad: STAR_PAD }],
+        obstacles: [{ kind: 'polygon', points: pts, pad: starPad }],
         starPts: pts,
       };
     }
@@ -143,9 +184,9 @@ export function App() {
             kind: 'ring',
             cx: x,
             cy: y,
-            outerR: RING_OUTER_R,
-            borderWidth: RING_BORDER,
-            pad: RING_PAD,
+            outerR: ringOuterR,
+            borderWidth: ringBorder,
+            pad: ringPad,
           },
         ],
         starPts: null,
@@ -159,13 +200,25 @@ export function App() {
           subPaths: LOGO_SUB_PATHS,
           cx: x,
           cy: y,
-          scale: LOGO_SCALE,
-          pad: LOGO_PAD,
+          scale: logoScale,
+          pad: logoPad,
         },
       ],
       starPts: null,
     };
-  }, [smoothCursor, shape]);
+  }, [
+    smoothCursor,
+    shape,
+    starOuterR,
+    starInnerR,
+    starTips,
+    starPad,
+    ringOuterR,
+    ringBorder,
+    ringPad,
+    logoScale,
+    logoPad,
+  ]);
 
   const lines = useMemo((): PositionedLine[] => {
     const { w, h } = stageSize;
@@ -173,18 +226,20 @@ export function App() {
       return [];
     }
     const region = {
-      x: STAGE_PAD,
-      y: STAGE_PAD,
-      w: w - 2 * STAGE_PAD,
-      h: h - 2 * STAGE_PAD,
+      x: stagePad,
+      y: stagePad,
+      w: w - 2 * stagePad,
+      h: h - 2 * stagePad,
     };
     return layoutTextAroundObstacles(
       prepared,
       region,
-      LINE_HEIGHT,
+      lineHeight,
       currentObstacle.obstacles,
+      undefined,
+      hyphenate,
     ).lines;
-  }, [prepared, stageSize, currentObstacle]);
+  }, [prepared, stageSize, currentObstacle, hyphenate, lineHeight, stagePad]);
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const el = stageRef.current;
@@ -215,7 +270,7 @@ export function App() {
           <polygon
             points={svgPointsAttr(currentObstacle.starPts)}
             fill="none"
-            stroke="var(--accent, #aa3bff)"
+            stroke="var(--accent)"
             strokeWidth="1.5"
             opacity="0.5"
           />
@@ -224,15 +279,15 @@ export function App() {
     }
 
     if (shape === 'ring') {
-      const innerR = RING_OUTER_R - RING_BORDER;
+      const innerR = ringOuterR - ringBorder;
       return (
         <svg className="flow-shape-svg">
           <circle
             cx={x}
             cy={y}
-            r={RING_OUTER_R}
+            r={ringOuterR}
             fill="none"
-            stroke="var(--accent, #aa3bff)"
+            stroke="var(--accent)"
             strokeWidth="1.5"
             opacity="0.5"
           />
@@ -241,7 +296,7 @@ export function App() {
             cy={y}
             r={innerR}
             fill="none"
-            stroke="var(--accent, #aa3bff)"
+            stroke="var(--accent)"
             strokeWidth="1.5"
             opacity="0.3"
           />
@@ -253,15 +308,15 @@ export function App() {
       return (
         <svg className="flow-shape-svg">
           <g
-            transform={`translate(${x},${y}) scale(${LOGO_SCALE}) translate(${LOGO_SVG_CENTER_TX},${LOGO_SVG_CENTER_TY})`}
+            transform={`translate(${x},${y}) scale(${logoScale}) translate(${LOGO_SVG_CENTER_TX},${LOGO_SVG_CENTER_TY})`}
           >
             <path
               d={LOGO_SVG_D}
-              fill="var(--accent, #aa3bff)"
+              fill="var(--accent)"
               fillRule="evenodd"
               fillOpacity="0.1"
-              stroke="var(--accent, #aa3bff)"
-              strokeWidth={1 / LOGO_SCALE}
+              stroke="var(--accent)"
+              strokeWidth={1 / logoScale}
               strokeOpacity="0.45"
             />
           </g>
@@ -276,15 +331,7 @@ export function App() {
     <div className="flow-page">
       <header className="flow-header">
         <h1>Flow around shapes</h1>
-        <p className="flow-lede">
-          Text reflows around a{' '}
-          {shape === 'logo'
-            ? 'logo (filled pixels block text)'
-            : shape === 'ring'
-              ? 'ring (border blocked, interior filled)'
-              : 'star polygon'}{' '}
-          following the pointer via <code>layoutNextLine</code>.
-        </p>
+
         <div className="flow-controls">
           <label className="flow-toggle">
             <input
@@ -293,6 +340,14 @@ export function App() {
               onChange={() => setShowBorder((v) => !v)}
             />
             Show border
+          </label>
+          <label className="flow-toggle">
+            <input
+              type="checkbox"
+              checked={hyphenate}
+              onChange={() => setHyphenate((v) => !v)}
+            />
+            Hyphenate
           </label>
           <fieldset className="flow-shape-picker">
             <legend>Shape</legend>
@@ -328,6 +383,122 @@ export function App() {
             </label>
           </fieldset>
         </div>
+
+        <div className="flow-sliders">
+          <div className="flow-slider-group">
+            <span className="flow-slider-group-title">Global</span>
+            <Slider
+              label="Font size"
+              value={fontSize}
+              min={8}
+              max={28}
+              onChange={setFontSize}
+            />
+            <Slider
+              label="Line height"
+              value={lineHeight}
+              min={8}
+              max={48}
+              onChange={setLineHeight}
+            />
+            <Slider
+              label="Padding"
+              value={stagePad}
+              min={0}
+              max={60}
+              onChange={setStagePad}
+            />
+            <Slider
+              label="Smoothing"
+              value={smoothFactor}
+              min={1}
+              max={30}
+              onChange={setSmoothFactor}
+            />
+          </div>
+
+          {shape === 'star' && (
+            <div className="flow-slider-group">
+              <span className="flow-slider-group-title">Star</span>
+              <Slider
+                label="Outer radius"
+                value={starOuterR}
+                min={40}
+                max={300}
+                onChange={setStarOuterR}
+              />
+              <Slider
+                label="Inner radius"
+                value={starInnerR}
+                min={10}
+                max={200}
+                onChange={setStarInnerR}
+              />
+              <Slider
+                label="Tips"
+                value={starTips}
+                min={3}
+                max={12}
+                onChange={setStarTips}
+              />
+              <Slider
+                label="Gap pad"
+                value={starPad}
+                min={0}
+                max={24}
+                onChange={setStarPad}
+              />
+            </div>
+          )}
+
+          {shape === 'ring' && (
+            <div className="flow-slider-group">
+              <span className="flow-slider-group-title">Ring</span>
+              <Slider
+                label="Outer radius"
+                value={ringOuterR}
+                min={40}
+                max={300}
+                onChange={setRingOuterR}
+              />
+              <Slider
+                label="Border width"
+                value={ringBorder}
+                min={5}
+                max={100}
+                onChange={setRingBorder}
+              />
+              <Slider
+                label="Gap pad"
+                value={ringPad}
+                min={0}
+                max={24}
+                onChange={setRingPad}
+              />
+            </div>
+          )}
+
+          {shape === 'logo' && (
+            <div className="flow-slider-group">
+              <span className="flow-slider-group-title">Logo</span>
+              <Slider
+                label="Scale"
+                value={logoScale}
+                min={0.5}
+                max={5}
+                step={0.1}
+                onChange={setLogoScale}
+              />
+              <Slider
+                label="Gap pad"
+                value={logoPad}
+                min={0}
+                max={24}
+                onChange={setLogoPad}
+              />
+            </div>
+          )}
+        </div>
       </header>
 
       <div
@@ -350,8 +521,8 @@ export function App() {
               style={{
                 left: line.x,
                 top: line.y,
-                font: FONT,
-                lineHeight: `${LINE_HEIGHT}px`,
+                font,
+                lineHeight: `${lineHeight}px`,
                 wordSpacing: justify
                   ? `${slack / spaceCount}px`
                   : undefined,

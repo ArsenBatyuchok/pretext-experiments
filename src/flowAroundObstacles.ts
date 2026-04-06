@@ -412,6 +412,7 @@ export function layoutTextAroundObstacles(
   lineHeight: number,
   obstacles: Obstacle[],
   startCursor: LayoutCursor = { segmentIndex: 0, graphemeIndex: 0 },
+  hyphenate = true,
 ): { lines: PositionedLine[]; cursor: LayoutCursor } {
   let cursor: LayoutCursor = startCursor;
   let lineTop = region.y;
@@ -458,17 +459,19 @@ export function layoutTextAroundObstacles(
       let finalWidth = line.width;
       let nextCursor = line.end;
 
-      const hyph = tryHyphenate(
-        prepared,
-        finalText,
-        finalWidth,
-        nextCursor,
-        sw,
-      );
-      if (hyph !== null) {
-        finalText = hyph.text;
-        finalWidth = hyph.width;
-        nextCursor = hyph.cursor;
+      if (hyphenate) {
+        const hyph = tryHyphenate(
+          prepared,
+          finalText,
+          finalWidth,
+          nextCursor,
+          sw,
+        );
+        if (hyph !== null) {
+          finalText = hyph.text;
+          finalWidth = hyph.width;
+          nextCursor = hyph.cursor;
+        }
       }
 
       lines.push({
