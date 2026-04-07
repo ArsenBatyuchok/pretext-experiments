@@ -151,7 +151,30 @@
   border: 1px solid var(--border);
   background: var(--bg);
   box-shadow: var(--shadow);
+}
+
+.flow-stage--follow {
   cursor: none;
+}
+
+.flow-preset-btn {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.flow-preset-btn:hover {
+  background: var(--accent-bg);
+}
+
+.flow-preset-btn--active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
 }
 
 .flow-shape-svg {
@@ -168,4 +191,5 @@
   white-space: pre;
   pointer-events: none;
   color: var(--text-h);
+  z-index: 1;
 }

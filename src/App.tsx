@@ -18,12 +18,15 @@ import {
   LOGO_SVG_D,
 } from './logoShape';
 
+import { type ManualPreset, ManualMode } from './ManualMode';
+
 import { TARIFF_BODY } from './tariffCorpus';
 
 import './App.css';
 
 const FONT_FAMILY = '"Favorit Mono", ui-monospace, Consolas, monospace';
 
+type AppMode = 'follow' | 'manual';
 type ShapeKind = 'star' | 'ring' | 'logo';
 
 function Slider({
@@ -61,6 +64,7 @@ export function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
 
+  const [mode, setMode] = useState<AppMode>('manual');
   const [showBorder, setShowBorder] = useState(false);
   const [hyphenate, setHyphenate] = useState(true);
   const [shape, setShape] = useState<ShapeKind>('logo');
@@ -81,6 +85,10 @@ export function App() {
 
   const [logoScale, setLogoScale] = useState(2.5);
   const [logoPad, setLogoPad] = useState(4);
+
+  const [manualPad, setManualPad] = useState(10);
+  const [preview, setPreview] = useState(false);
+  const [pendingPreset, setPendingPreset] = useState<ManualPreset | null>(null);
 
   const [smoothCursor, setSmoothCursor] = useState<{
     x: number;
@@ -103,6 +111,9 @@ export function App() {
   );
 
   useLayoutEffect(() => {
+    if (mode !== 'follow') {
+      return;
+    }
     const el = stageRef.current;
     if (!el) {
       return;
@@ -115,9 +126,12 @@ export function App() {
     const ro = new ResizeObserver(sync);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
+    if (mode !== 'follow') {
+      return;
+    }
     let id = 0;
     let alive = true;
 
@@ -158,7 +172,7 @@ export function App() {
       alive = false;
       cancelAnimationFrame(id);
     };
-  }, []);
+  }, [mode]);
 
   const currentObstacle = useMemo((): {
     obstacles: Obstacle[];
@@ -221,6 +235,9 @@ export function App() {
   ]);
 
   const lines = useMemo((): PositionedLine[] => {
+    if (mode !== 'follow') {
+      return [];
+    }
     const { w, h } = stageSize;
     if (w < 40 || h < 40) {
       return [];
@@ -239,7 +256,15 @@ export function App() {
       undefined,
       hyphenate,
     ).lines;
-  }, [prepared, stageSize, currentObstacle, hyphenate, lineHeight, stagePad]);
+  }, [
+    mode,
+    prepared,
+    stageSize,
+    currentObstacle,
+    hyphenate,
+    lineHeight,
+    stagePad,
+  ]);
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const el = stageRef.current;
@@ -333,55 +358,119 @@ export function App() {
         <h1>Flow around shapes</h1>
 
         <div className="flow-controls">
-          <label className="flow-toggle">
-            <input
-              type="checkbox"
-              checked={showBorder}
-              onChange={() => setShowBorder((v) => !v)}
-            />
-            Show border
-          </label>
-          <label className="flow-toggle">
-            <input
-              type="checkbox"
-              checked={hyphenate}
-              onChange={() => setHyphenate((v) => !v)}
-            />
-            Hyphenate
-          </label>
           <fieldset className="flow-shape-picker">
-            <legend>Shape</legend>
+            <legend>Mode</legend>
             <label>
               <input
                 type="radio"
-                name="shape"
-                value="logo"
-                checked={shape === 'logo'}
-                onChange={() => setShape('logo')}
+                name="mode"
+                value="follow"
+                checked={mode === 'follow'}
+                onChange={() => setMode('follow')}
               />
-              Logo
+              Follow
             </label>
             <label>
               <input
                 type="radio"
-                name="shape"
-                value="ring"
-                checked={shape === 'ring'}
-                onChange={() => setShape('ring')}
+                name="mode"
+                value="manual"
+                checked={mode === 'manual'}
+                onChange={() => setMode('manual')}
               />
-              Ring
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="shape"
-                value="star"
-                checked={shape === 'star'}
-                onChange={() => setShape('star')}
-              />
-              Star
+              Manual
             </label>
           </fieldset>
+
+          {mode === 'follow' && (
+            <>
+              <label className="flow-toggle">
+                <input
+                  type="checkbox"
+                  checked={showBorder}
+                  onChange={() => setShowBorder((v) => !v)}
+                />
+                Show border
+              </label>
+              <label className="flow-toggle">
+                <input
+                  type="checkbox"
+                  checked={hyphenate}
+                  onChange={() => setHyphenate((v) => !v)}
+                />
+                Hyphenate
+              </label>
+              <fieldset className="flow-shape-picker">
+                <legend>Shape</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="shape"
+                    value="logo"
+                    checked={shape === 'logo'}
+                    onChange={() => setShape('logo')}
+                  />
+                  Logo
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="shape"
+                    value="ring"
+                    checked={shape === 'ring'}
+                    onChange={() => setShape('ring')}
+                  />
+                  Ring
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="shape"
+                    value="star"
+                    checked={shape === 'star'}
+                    onChange={() => setShape('star')}
+                  />
+                  Star
+                </label>
+              </fieldset>
+            </>
+          )}
+
+          {mode === 'manual' && (
+            <>
+              <label className="flow-toggle">
+                <input
+                  type="checkbox"
+                  checked={hyphenate}
+                  onChange={() => setHyphenate((v) => !v)}
+                />
+                Hyphenate
+              </label>
+              <label className="flow-toggle">
+                <input
+                  type="checkbox"
+                  checked={preview}
+                  onChange={() => {
+                    setPreview((v) => !v);
+                    setPendingPreset(null);
+                  }}
+                />
+                Preview
+              </label>
+              <fieldset className="flow-shape-picker">
+                <legend>Add shape</legend>
+                {(['triangle', 'circle', 'square'] as ManualPreset[]).map((p) => (
+                  <button
+                    key={p}
+                    className={`flow-preset-btn ${pendingPreset === p ? 'flow-preset-btn--active' : ''}`}
+                    onClick={() => setPendingPreset((cur) => (cur === p ? null : p))}
+                  >
+                    {p[0]!.toUpperCase() + p.slice(1)}
+                  </button>
+                ))}
+              </fieldset>
+            </>
+          )}
         </div>
 
         <div className="flow-sliders">
@@ -408,16 +497,27 @@ export function App() {
               max={60}
               onChange={setStagePad}
             />
-            <Slider
-              label="Smoothing"
-              value={smoothFactor}
-              min={1}
-              max={30}
-              onChange={setSmoothFactor}
-            />
+            {mode === 'follow' && (
+              <Slider
+                label="Smoothing"
+                value={smoothFactor}
+                min={1}
+                max={30}
+                onChange={setSmoothFactor}
+              />
+            )}
+            {mode === 'manual' && (
+              <Slider
+                label="Shape pad"
+                value={manualPad}
+                min={0}
+                max={40}
+                onChange={setManualPad}
+              />
+            )}
           </div>
 
-          {shape === 'star' && (
+          {mode === 'follow' && shape === 'star' && (
             <div className="flow-slider-group">
               <span className="flow-slider-group-title">Star</span>
               <Slider
@@ -451,7 +551,7 @@ export function App() {
             </div>
           )}
 
-          {shape === 'ring' && (
+          {mode === 'follow' && shape === 'ring' && (
             <div className="flow-slider-group">
               <span className="flow-slider-group-title">Ring</span>
               <Slider
@@ -478,7 +578,7 @@ export function App() {
             </div>
           )}
 
-          {shape === 'logo' && (
+          {mode === 'follow' && shape === 'logo' && (
             <div className="flow-slider-group">
               <span className="flow-slider-group-title">Logo</span>
               <Slider
@@ -501,38 +601,52 @@ export function App() {
         </div>
       </header>
 
-      <div
-        ref={stageRef}
-        className="flow-stage"
-        onPointerMove={onPointerMove}
-        onPointerLeave={onPointerLeave}
-      >
-        {renderShapeSVG()}
+      {mode === 'follow' ? (
+        <div
+          ref={stageRef}
+          className="flow-stage flow-stage--follow"
+          onPointerMove={onPointerMove}
+          onPointerLeave={onPointerLeave}
+        >
+          {renderShapeSVG()}
 
-        {lines.map((line, i) => {
-          const slack = line.slotWidth - line.width;
-          const spaceCount = line.text.split(' ').length - 1;
-          const justify =
-            spaceCount > 0 && slack > 0 && slack / spaceCount < 14;
-          return (
-            <div
-              key={i}
-              className="flow-line"
-              style={{
-                left: line.x,
-                top: line.y,
-                font,
-                lineHeight: `${lineHeight}px`,
-                wordSpacing: justify
-                  ? `${slack / spaceCount}px`
-                  : undefined,
-              }}
-            >
-              {line.text}
-            </div>
-          );
-        })}
-      </div>
+          {lines.map((line, i) => {
+            const slack = line.slotWidth - line.width;
+            const spaceCount = line.text.split(' ').length - 1;
+            const justify =
+              spaceCount > 0 && slack > 0 && slack / spaceCount < 14;
+            return (
+              <div
+                key={i}
+                className="flow-line"
+                style={{
+                  left: line.x,
+                  top: line.y,
+                  font,
+                  lineHeight: `${lineHeight}px`,
+                  wordSpacing: justify
+                    ? `${slack / spaceCount}px`
+                    : undefined,
+                }}
+              >
+                {line.text}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <ManualMode
+          prepared={prepared}
+          font={font}
+          lineHeight={lineHeight}
+          stagePad={stagePad}
+          shapePad={manualPad}
+          hyphenate={hyphenate}
+          editing={!preview}
+          pendingPreset={pendingPreset}
+          onPresetPlaced={() => setPendingPreset(null)}
+        />
+      )}
     </div>
   );
 }

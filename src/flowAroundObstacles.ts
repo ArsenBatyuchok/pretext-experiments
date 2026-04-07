@@ -4,6 +4,8 @@ import {
   type PreparedTextWithSegments,
 } from '@chenglou/pretext';
 
+import { type BezierShape, bezierScanlineXs } from './bezierMath';
+
 export type Interval = { left: number; right: number };
 
 export type Point = { x: number; y: number };
@@ -42,11 +44,18 @@ export type SvgPathObstacle = {
   pad: number;
 };
 
+export type BezierPathObstacle = {
+  kind: 'bezierPath';
+  shapes: BezierShape[];
+  pad: number;
+};
+
 export type Obstacle =
   | CircleObstacle
   | PolygonObstacle
   | RingObstacle
-  | SvgPathObstacle;
+  | SvgPathObstacle
+  | BezierPathObstacle;
 
 export type PositionedLine = {
   x: number;
@@ -293,6 +302,30 @@ function svgPathIntervalsForBand(
   return mergeIntervals(all);
 }
 
+function bezierPathIntervalsForBand(
+  o: BezierPathObstacle,
+  bandTop: number,
+  bandBottom: number,
+): Interval[] {
+  const pad = o.pad;
+  const top = bandTop - pad;
+  const bottom = bandBottom + pad;
+  if (o.shapes.length === 0) {
+    return [];
+  }
+
+  const all: Interval[] = [];
+  for (let s = 0; s < BAND_SAMPLES; s++) {
+    const y = top + ((bottom - top) * (s + 0.5)) / BAND_SAMPLES;
+    const xs = bezierScanlineXs(o.shapes, y);
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      all.push({ left: xs[i]! - pad, right: xs[i + 1]! + pad });
+    }
+  }
+
+  return mergeIntervals(all);
+}
+
 function obstacleIntervalsForBand(
   o: Obstacle,
   bandTop: number,
@@ -307,6 +340,9 @@ function obstacleIntervalsForBand(
   }
   if (o.kind === 'svgPath') {
     return svgPathIntervalsForBand(o, bandTop, bandBottom);
+  }
+  if (o.kind === 'bezierPath') {
+    return bezierPathIntervalsForBand(o, bandTop, bandBottom);
   }
   return polygonIntervalsForBand(o, bandTop, bandBottom);
 }
