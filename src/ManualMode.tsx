@@ -56,13 +56,6 @@ function dist(a: Point, b: Point): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function mirror(anchor: Point, handle: Point): Point {
-  return {
-    x: 2 * anchor.x - handle.x,
-    y: 2 * anchor.y - handle.y,
-  };
-}
-
 export type ManualPreset = 'triangle' | 'circle' | 'square';
 
 function makePresetShape(
